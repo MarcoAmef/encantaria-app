@@ -2,9 +2,7 @@ import jwt
 import bcrypt
 import os
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
 
-load_dotenv()
 SECRET = os.getenv("JWT_SECRET", "secret")
 
 def gerar_senha_hash(senha):

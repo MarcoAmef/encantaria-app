@@ -1,16 +1,7 @@
-import cloudinary
-import cloudinary.uploader
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
-
-cloudinary.config(
-    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
-    api_key=os.getenv("CLOUDINARY_API_KEY"),
-    api_secret=os.getenv("CLOUDINARY_API_SECRET")
-)
-
-def upload_image(file_path):
-    response = cloudinary.uploader.upload(file_path)
-    return response["secure_url"]
+def upload_image(file):
+    os.makedirs("uploads", exist_ok=True)
+    path = os.path.join("uploads", file.filename)
+    file.save(path)
+    return path

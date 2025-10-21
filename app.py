@@ -1,107 +1,124 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
-from bson import ObjectId
-from db import usuarios, anuncios, mensagens
+from db import get_conn
 from utils.auth import gerar_token, gerar_senha_hash, verificar_senha, decodificar_token
 from utils.cloudinary_upload import upload_image
 from datetime import datetime
+import os
+import json
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="frontend", static_url_path="")
 CORS(app)
 
-def serialize_doc(doc):
-    doc["_id"] = str(doc["_id"])
-    return doc
+def serialize_row(row):
+    return dict(row)
 
-# 🧍 Registro
+@app.route("/")
+def serve_index():
+    return send_from_directory(app.static_folder, "index.html")
+
+@app.route("/<path:path>")
+def static_proxy(path):
+    return send_from_directory(app.static_folder, path)
+
+# Registro
 @app.route("/register", methods=["POST"])
 def register():
     data = request.json
-    if usuarios.find_one({"email": data["email"]}):
-        return jsonify({"error": "Email já cadastrado"}), 400
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM usuarios WHERE email=?", (data["email"],))
+    if cursor.fetchone():
+        return jsonify({"error":"Email já cadastrado"}),400
+    senha_hash = gerar_senha_hash(data["senha"])
+    now = datetime.utcnow().isoformat()
+    cursor.execute("""
+        INSERT INTO usuarios (nome,email,senha,descricao,tipo_usuario,cidade,estado,categorias,portfolio,foto_url,data_criacao)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    """, (
+        data.get("nome"),
+        data.get("email"),
+        senha_hash,
+        data.get("descricao",""),
+        data.get("tipo_usuario","artista"),
+        data.get("cidade",""),
+        data.get("estado",""),
+        ",".join(data.get("categorias",[])),
+        json.dumps(data.get("portfolio",[])),
+        data.get("foto_url",None),
+        now
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"message":"Usuário registrado com sucesso!"}),201
 
-    data["senha"] = gerar_senha_hash(data["senha"])
-    data["data_criacao"] = datetime.utcnow().isoformat()
-    usuarios.insert_one(data)
-    return jsonify({"message": "Usuário registrado com sucesso!"}), 201
-
-# 🔐 Login
+# Login
 @app.route("/login", methods=["POST"])
 def login():
     data = request.json
-    usuario = usuarios.find_one({"email": data["email"]})
-    if not usuario or not verificar_senha(data["senha"], usuario["senha"]):
-        return jsonify({"error": "Credenciais inválidas"}), 401
-
-    token = gerar_token(usuario["_id"])
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM usuarios WHERE email=?",(data["email"],))
+    row = cursor.fetchone()
+    conn.close()
+    if not row or not verificar_senha(data["senha"], row["senha"]):
+        return jsonify({"error":"Credenciais inválidas"}),401
+    token = gerar_token(row["id"])
     return jsonify({"token": token})
 
-# 👤 Perfil (GET)
-@app.route("/usuarios/<id>", methods=["GET"])
-def get_user(id):
-    usuario = usuarios.find_one({"_id": ObjectId(id)})
-    if not usuario:
-        return jsonify({"error": "Usuário não encontrado"}), 404
-    return jsonify(serialize_doc(usuario))
-
-# 🎭 Listar artistas
+# Listar usuários
 @app.route("/usuarios", methods=["GET"])
-def get_all_users():
-    lista = [serialize_doc(u) for u in usuarios.find()]
-    return jsonify(lista)
+def listar_usuarios():
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM usuarios")
+    rows = cursor.fetchall()
+    conn.close()
+    return jsonify([serialize_row(r) for r in rows])
 
-# 📢 Criar anúncio
+# Criar anúncio
 @app.route("/anuncios", methods=["POST"])
 def criar_anuncio():
     token = request.headers.get("Authorization")
-    if not token:
-        return jsonify({"error": "Token ausente"}), 401
-    payload = decodificar_token(token)
+    payload = decodificar_token(token) if token else None
     if not payload:
-        return jsonify({"error": "Token inválido"}), 401
-
+        return jsonify({"error":"Token inválido"}),401
     data = request.json
-    data["usuario_id"] = ObjectId(payload["id"])
-    data["data_publicacao"] = datetime.utcnow().isoformat()
-    anuncios.insert_one(data)
-    return jsonify({"message": "Anúncio criado com sucesso!"}), 201
+    now = datetime.utcnow().isoformat()
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO anuncios (usuario_id,titulo,descricao,categoria,tipo,cidade,estado,data_publicacao)
+        VALUES (?,?,?,?,?,?,?,?)
+    """, (
+        payload["id"],
+        data.get("titulo"),
+        data.get("descricao"),
+        data.get("categoria"),
+        data.get("tipo"),
+        data.get("cidade",""),
+        data.get("estado",""),
+        now
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"message":"Anúncio criado com sucesso!"}),201
 
-# 🔎 Buscar anúncios
+# Listar anúncios
 @app.route("/anuncios", methods=["GET"])
 def listar_anuncios():
-    todos = [serialize_doc(a) for a in anuncios.find()]
-    return jsonify(todos)
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM anuncios")
+    rows = cursor.fetchall()
+    conn.close()
+    return jsonify([serialize_row(r) for r in rows])
 
-# 📬 Enviar mensagem
-@app.route("/mensagens", methods=["POST"])
-def enviar_mensagem():
-    data = request.json
-    mensagens.insert_one({
-        "remetente_id": ObjectId(data["remetente_id"]),
-        "destinatario_id": ObjectId(data["destinatario_id"]),
-        "conteudo": data["conteudo"],
-        "data_envio": datetime.utcnow().isoformat(),
-        "lida": False
-    })
-    return jsonify({"message": "Mensagem enviada!"}), 201
-
-# 🌟 Avaliar usuário
-@app.route("/avaliar/<id>", methods=["POST"])
-def avaliar_usuario(id):
-    data = request.json
-    avaliacao = {
-        "usuario_id": data.get("avaliador_id"),
-        "nota": data.get("nota"),
-        "comentario": data.get("comentario")
-    }
-    usuarios.update_one({"_id": ObjectId(id)}, {"$push": {"avaliacoes": avaliacao}})
-    return jsonify({"message": "Avaliação registrada!"}), 200
-
-# 📸 Upload de imagem
+# Upload de imagem
 @app.route("/upload", methods=["POST"])
 def upload():
     if "file" not in request.files:
-        return jsonify({"error": "Nenhum arquivo enviado"}), 400
+        return jsonify({"error":"Nenhum arquivo enviado"}),400
     file = request.files["file"]
     url = upload_image(file)
     return jsonify({"url": url})

@@ -1,165 +1,58 @@
-# seed.py
-from db import usuarios, anuncios, mensagens
+from db import get_conn
 from utils.auth import gerar_senha_hash
-from bson import ObjectId
 from datetime import datetime
-import pprint
 
 def seed():
-    print("🧹 Limpando coleções...")
-    usuarios.delete_many({})
-    anuncios.delete_many({})
-    mensagens.delete_many({})
+    conn = get_conn()
+    cursor = conn.cursor()
 
-    print("✨ Inserindo usuários de exemplo...")
-    usuarios_docs = [
-        {
-            "nome": "Luna Andrade",
-            "email": "luna@arte.com",
-            "senha": gerar_senha_hash("senha123"),
-            "descricao": "Cantora e compositora de MPB. Trabalho com apresentações em bares e eventos.",
-            "tipo_usuario": "artista",
-            "localizacao": {"cidade": "Belém", "estado": "PA"},
-            "categorias": ["música", "voz", "MPB"],
-            "portfolio": [{"link": "https://instagram.com/luna.mpb"}],
-            "foto_url": None,
-            "avaliacoes": [],
-            "avaliacoes_resumo": {"media": None, "count": 0},
-            "data_criacao": datetime.utcnow().isoformat()
-        },
-        {
-            "nome": "Rafael Gomes",
-            "email": "rafa@eventos.com",
-            "senha": gerar_senha_hash("senha123"),
-            "descricao": "Produtor cultural e organizador de eventos artísticos.",
-            "tipo_usuario": "contratante",
-            "localizacao": {"cidade": "Belém", "estado": "PA"},
-            "categorias": ["produção", "eventos"],
-            "portfolio": [],
-            "foto_url": None,
-            "avaliacoes": [],
-            "avaliacoes_resumo": {"media": None, "count": 0},
-            "data_criacao": datetime.utcnow().isoformat()
-        },
-        {
-            "nome": "Clara Santos",
-            "email": "clara@circo.com",
-            "senha": gerar_senha_hash("senha123"),
-            "descricao": "Malabarista e artista de circo. Atuo em festas infantis, praças e shows de rua.",
-            "tipo_usuario": "artista",
-            "localizacao": {"cidade": "Ananindeua", "estado": "PA"},
-            "categorias": ["circo", "malabarismo"],
-            "portfolio": [{"link": "https://instagram.com/claracirco"}],
-            "foto_url": None,
-            "avaliacoes": [],
-            "avaliacoes_resumo": {"media": None, "count": 0},
-            "data_criacao": datetime.utcnow().isoformat()
-        },
-        {
-            "nome": "Marco Estrada",
-            "email": "marco@encantaria.com",
-            "senha": gerar_senha_hash("marco123"),
-            "descricao": "Animador de festas, DJ e organizador de pequenos eventos.",
-            "tipo_usuario": "artista",
-            "localizacao": {"cidade": "Belém", "estado": "PA"},
-            "categorias": ["animação", "DJ", "eventos"],
-            "portfolio": [{"link": "https://instagram.com/marcoencanta"}],
-            "foto_url": None,
-            "avaliacoes": [],
-            "avaliacoes_resumo": {"media": None, "count": 0},
-            "data_criacao": datetime.utcnow().isoformat()
-        }
+    # Limpa tabelas
+    cursor.execute("DELETE FROM usuarios")
+    cursor.execute("DELETE FROM anuncios")
+    cursor.execute("DELETE FROM mensagens")
+
+    now = datetime.utcnow().isoformat()
+
+    # Usuários de exemplo
+    usuarios = [
+        ("Luna Andrade","luna@arte.com",gerar_senha_hash("senha123"),"Cantora e compositora de MPB","artista","Belém","PA","música,voz,MPB","https://instagram.com/luna.mpb",None,now),
+        ("Rafael Gomes","rafa@eventos.com",gerar_senha_hash("senha123"),"Produtor cultural","contratante","Belém","PA","produção,eventos","",None,now),
+        ("Clara Santos","clara@circo.com",gerar_senha_hash("senha123"),"Malabarista e artista de circo","artista","Ananindeua","PA","circo,malabarismo","https://instagram.com/claracirco",None,now),
+        ("Marco Estrada","marco@encantaria.com",gerar_senha_hash("marco123"),"Animador de festas, DJ e organizador de pequenos eventos","artista","Belém","PA","animação,DJ,eventos","https://instagram.com/marcoencanta",None,now)
     ]
+    cursor.executemany("""
+        INSERT INTO usuarios
+        (nome,email,senha,descricao,tipo_usuario,cidade,estado,categorias,portfolio,foto_url,data_criacao)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    """, usuarios)
 
-    result = usuarios.insert_many(usuarios_docs)
-    inserted_ids = result.inserted_ids
-    print(f"Usuários inseridos: {len(inserted_ids)}")
+    # Busca IDs para anúncios
+    cursor.execute("SELECT id,email FROM usuarios")
+    user_map = {row["email"]: row["id"] for row in cursor.fetchall()}
 
-    # Buscar usuários por email (para garantir ObjectId corretos)
-    luna = usuarios.find_one({"email": "luna@arte.com"})
-    rafa = usuarios.find_one({"email": "rafa@eventos.com"})
-    clara = usuarios.find_one({"email": "clara@circo.com"})
-    marco = usuarios.find_one({"email": "marco@encantaria.com"})
-
-    print("✨ Inserindo anúncios de exemplo...")
-    anuncios_docs = [
-        {
-            "usuario_id": luna["_id"],
-            "titulo": "Procuro banda para barzinho - cantora disponível",
-            "descricao": "Sou cantora de MPB e procuro músicos para apresentações semanais em barzinhos locais.",
-            "categoria": "música",
-            "tipo": "procura",
-            "localizacao": {"cidade": "Belém", "estado": "PA"},
-            "data_publicacao": datetime.utcnow().isoformat(),
-            "status": "ativo"
-        },
-        {
-            "usuario_id": rafa["_id"],
-            "titulo": "Contratando artistas para feira cultural",
-            "descricao": "Evento cultural no centro de Belém. Procuramos músicos, palhaços e performers para o dia 20/11.",
-            "categoria": "eventos",
-            "tipo": "procura",
-            "localizacao": {"cidade": "Belém", "estado": "PA"},
-            "data_publicacao": datetime.utcnow().isoformat(),
-            "status": "ativo"
-        },
-        {
-            "usuario_id": clara["_id"],
-            "titulo": "Shows de malabarismo e circo para festas",
-            "descricao": "Apresentações de malabarismo, equilibrismo e números cômicos para festas infantis e eventos empresariais.",
-            "categoria": "circo",
-            "tipo": "oferece",
-            "localizacao": {"cidade": "Ananindeua", "estado": "PA"},
-            "data_publicacao": datetime.utcnow().isoformat(),
-            "status": "ativo"
-        },
-        {
-            "usuario_id": marco["_id"],
-            "titulo": "Animador e DJ para festas infantis",
-            "descricao": "Animação completa com brincadeiras, músicas e sonorização. Atuo em Belém e região metropolitana.",
-            "categoria": "animação",
-            "tipo": "oferece",
-            "localizacao": {"cidade": "Belém", "estado": "PA"},
-            "data_publicacao": datetime.utcnow().isoformat(),
-            "status": "ativo"
-        }
+    anuncios = [
+        (user_map["luna@arte.com"],"Procuro banda para barzinho - cantora disponível",
+         "Sou cantora de MPB e procuro músicos para apresentações semanais em barzinhos locais.",
+         "música","procura","Belém","PA",now),
+        (user_map["rafa@eventos.com"],"Contratando artistas para feira cultural",
+         "Evento cultural no centro de Belém. Procuramos músicos, palhaços e performers.",
+         "eventos","procura","Belém","PA",now),
+        (user_map["clara@circo.com"],"Shows de malabarismo e circo para festas",
+         "Apresentações de malabarismo, equilibrismo e números cômicos para festas infantis.",
+         "circo","oferece","Ananindeua","PA",now),
+        (user_map["marco@encantaria.com"],"Animador e DJ para festas infantis",
+         "Animação completa com brincadeiras, músicas e sonorização. Atuo em Belém e região.",
+         "animação","oferece","Belém","PA",now)
     ]
+    cursor.executemany("""
+        INSERT INTO anuncios
+        (usuario_id,titulo,descricao,categoria,tipo,cidade,estado,data_publicacao)
+        VALUES (?,?,?,?,?,?,?,?)
+    """, anuncios)
 
-    anuncios_result = anuncios.insert_many(anuncios_docs)
-    print(f"Anúncios inseridos: {len(anuncios_result.inserted_ids)}")
-
-    print("✨ Inserindo mensagens de exemplo...")
-    mensagens_docs = [
-        {
-            "remetente_id": rafa["_id"],
-            "destinatario_id": clara["_id"],
-            "conteudo": "Oi Clara, adorei seu trabalho! Você tem disponibilidade para o evento da semana que vem?",
-            "data_envio": datetime.utcnow().isoformat(),
-            "lida": False
-        },
-        {
-            "remetente_id": clara["_id"],
-            "destinatario_id": rafa["_id"],
-            "conteudo": "Olá Rafael! Tenho sim. Me envie os detalhes do horário e cachê.",
-            "data_envio": datetime.utcnow().isoformat(),
-            "lida": False
-        },
-        {
-            "remetente_id": marco["_id"],
-            "destinatario_id": luna["_id"],
-            "conteudo": "Oi Luna, vi seu anúncio — topa uma apresentação num bar no sábado?",
-            "data_envio": datetime.utcnow().isoformat(),
-            "lida": False
-        }
-    ]
-
-    mensagens.insert_many(mensagens_docs)
-    print(f"Mensagens inseridas: {len(mensagens_docs)}")
-
+    conn.commit()
+    conn.close()
     print("✅ Seed concluído com sucesso!")
-    print("\nUsuários inseridos (exemplo):")
-    for u in usuarios.find({}, {"senha": 0}).limit(10):
-        pprint.pprint({k: v for k, v in u.items()})
 
 if __name__ == "__main__":
     seed()
