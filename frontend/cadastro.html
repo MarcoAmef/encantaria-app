@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Encantaria — Cadastro</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="logo">Encantaria</div>
+    <nav class="nav">
+      <a href="index.html">home</a>
+      <a href="login.html">login</a>
+    </nav>
+  </header>
+
+  <main class="container" style="display:flex; justify-content:center; align-items:flex-start;">
+    <div class="card" role="form" aria-label="Formulário de cadastro">
+      <h3 style="margin-top:0">Criar conta</h3>
+
+      <div class="form-group">
+        <label class="form-label">Nome e sobrenome</label>
+        <input id="nome" type="text" placeholder="Nome completo" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input id="email" type="email" placeholder="seu@email.com" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Senha</label>
+        <input id="senha" type="password" placeholder="Senha" />
+      </div>
+
+      <div style="text-align:center;">
+        <button class="btn" onclick="registrar()">enviar</button>
+      </div>
+
+      <p id="msg" style="margin-top:12px;color:var(--muted)"></p>
+    </div>
+  </main>
+
+  <script>
+    async function registrar(){
+      const payload = {
+        nome: document.getElementById('nome').value,
+        email: document.getElementById('email').value,
+        senha: document.getElementById('senha').value,
+        tipo_usuario: "artista"
+      };
+      try{
+        const res = await fetch('/register', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        document.getElementById('msg').innerText = data.message || data.error || JSON.stringify(data);
+        if(res.ok) setTimeout(()=> location.href = 'login.html', 900);
+      }catch(e){
+        document.getElementById('msg').innerText = 'Erro ao conectar com o servidor.';
+      }
+    }
+  </script>
+</body>
+</html>

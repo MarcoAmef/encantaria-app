@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Encantaria — Recém-Chegados</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* pequena estilização para o estado ativo do menu */
+    .side-menu a { display:block; margin:6px 0; color:var(--text); text-decoration:none; }
+    .side-menu a.active { font-weight:700; color:var(--accent); }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="logo">Encantaria</div>
+    <nav class="nav">
+      <a href="index.html">home</a>
+      <a href="cadastro.html">cadastro</a>
+      <a href="login.html">login</a>
+    </nav>
+  </header>
+
+  <aside class="side-menu" aria-label="Filtro por categorias">
+    <strong>Categorias</strong>
+    <!-- use data-cat para facilitar leitura (use 'Geral' para tudo) -->
+    <a href="#" data-cat="Geral" class="active">Geral</a>
+    <a href="#" data-cat="Pintura">Pintura</a>
+    <a href="#" data-cat="Música">Música</a>
+    <a href="#" data-cat="Dança">Dança</a>
+    <a href="#" data-cat="Teatro">Teatro</a>
+    <a href="#" data-cat="Fotografia">Fotografia</a>
+  </aside>
+
+  <main class="container">
+    <h3>Recém-Chegados ✨</h3>
+
+    <div class="listings" id="anuncios">
+      <!-- carregado via JS -->
+    </div>
+  </main>
+
+  <script>
+    // cache local dos anúncios para evitar múltiplos fetches
+    let anunciosCache = null;
+
+    // função que converte texto p/ forma normalizada (para comparação)
+    function norm(str) {
+      return (str || '').toString().trim().toLowerCase();
+    }
+
+    async function carregarAnuncios(categoria = 'Geral') {
+      const wrap = document.getElementById('anuncios');
+      wrap.innerHTML = '<p>Carregando...</p>';
+
+      try {
+        // busca só na primeira vez
+        if (!anunciosCache) {
+          const res = await fetch('/anuncios');
+          if (!res.ok) throw new Error('Erro ao buscar anúncios: ' + res.status);
+          anunciosCache = await res.json();
+          if (!Array.isArray(anunciosCache)) anunciosCache = [];
+        }
+
+        // filtra no cliente
+        const resultados = (categoria && norm(categoria) !== 'geral')
+          ? anunciosCache.filter(a => norm(a.categoria) === norm(categoria))
+          : anunciosCache;
+
+        // render
+        wrap.innerHTML = '';
+        if (!resultados.length) {
+          wrap.innerHTML = `<p>Nenhum anúncio encontrado para "<strong>${categoria}</strong>".</p>`;
+          return;
+        }
+
+        resultados.forEach(a => {
+          const div = document.createElement('div');
+          div.className = 'listing';
+
+          const img = document.createElement('img');
+          // usa id se existir, fallback seed aleatório
+          const seed = a.id ?? Math.floor(Math.random()*10000);
+          img.src = `https://picsum.photos/seed/anuncio${seed}/400/240`;
+          img.alt = a.titulo || 'anúncio';
+          div.appendChild(img);
+
+          const title = document.createElement('div');
+          title.innerHTML = `<strong>${a.titulo || 'Título'}</strong>`;
+          div.appendChild(title);
+
+          const cat = document.createElement('div');
+          cat.style.fontSize = '13px';
+          cat.style.color = '#666';
+          cat.innerText = a.categoria || '';
+          div.appendChild(cat);
+
+          const btn = document.createElement('a');
+          btn.className = 'btn';
+          btn.style.display='inline-block';
+          btn.style.marginTop='8px';
+          // caso tenha página de detalhes, passar id como querystring
+          btn.href = `detalhes.html?id=${encodeURIComponent(a.id ?? '')}`;
+          btn.innerText = '--Saiba mais--';
+          div.appendChild(btn);
+
+          wrap.appendChild(div);
+        });
+      } catch (e) {
+        console.error(e);
+        wrap.innerHTML = '<p>Erro ao carregar anúncios. Veja o console.</p>';
+      }
+    }
+
+    // adiciona handlers do side menu
+    document.querySelectorAll('.side-menu a[data-cat]').forEach(link => {
+      link.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const cat = link.getAttribute('data-cat');
+
+        // atualiza classe active
+        document.querySelectorAll('.side-menu a').forEach(a => a.classList.remove('active'));
+        link.classList.add('active');
+
+        // carrega anúncios da categoria selecionada
+        carregarAnuncios(cat);
+      });
+    });
+
+    // carregamento inicial (Geral)
+    carregarAnuncios('Geral');
+  </script>
+</body>
+</html>

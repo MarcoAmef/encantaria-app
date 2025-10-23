@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Encantaria — Login</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="logo">Encantaria</div>
+    <nav class="nav">
+      <a href="index.html">home</a>
+      <a href="cadastro.html">cadastro</a>
+    </nav>
+  </header>
+
+  <main class="container" style="display:flex; justify-content:center; align-items:flex-start;">
+    <div class="card" aria-label="Formulário de login">
+      <h3 style="margin-top:0">Entrar</h3>
+
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input id="email" type="email" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Senha</label>
+        <input id="senha" type="password" />
+      </div>
+
+      <div style="text-align:center;">
+        <button class="btn" onclick="logar()">enviar</button>
+      </div>
+
+      <p id="msg" style="margin-top:12px;color:var(--muted)"></p>
+    </div>
+  </main>
+
+  <script>
+async function logar() {
+  const btn = document.querySelector('.btn');
+  btn.disabled = true;
+
+  const payload = {
+    email: document.getElementById('email').value,
+    senha: document.getElementById('senha').value
+  };
+
+  try {
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    // tenta ler JSON de forma segura
+    let data;
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      data = await res.json();
+    } else {
+      data = { text: await res.text() };
+    }
+
+    if (res.ok && data.token) {
+      localStorage.setItem('enc_token', data.token);
+      document.getElementById('msg').innerText = 'Login realizado! Redirecionando...';
+      setTimeout(() => location.href = 'recem-chegados.html', 700);
+    } else {
+      // mostra a mensagem do backend se existir, senão o texto cru
+      document.getElementById('msg').innerText = data.error || data.message || data.text || 'Credenciais inválidas';
+    }
+  } catch (err) {
+    console.error(err);
+    document.getElementById('msg').innerText = 'Erro ao conectar com o servidor.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
