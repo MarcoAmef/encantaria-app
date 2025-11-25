@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Encantaria — Publicar</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="logo">Encantaria</div>
+    <nav class="nav">
+      <a href="index.html">home</a>
+      <a href="recem-chegados.html">voltar</a>
+    </nav>
+  </header>
+
+  <main class="container" style="display:flex; justify-content:center;">
+    <div class="card" style="width:500px;">
+      <h3>Publicar Novo Talento</h3>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:20px;">
+        Divulgue sua arte ou encontre artistas para o seu evento.
+      </p>
+
+      <div class="form-group">
+        <label class="form-label">Título do Anúncio</label>
+        <input id="titulo" type="text" placeholder="Ex: Cantor de MPB para eventos" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Categoria</label>
+        <select id="categoria" style="width:100%; padding:12px; border-radius:20px; border:none; box-shadow: inset 0 -1px 0 rgba(0,0,0,0.06); font-family:inherit;">
+          <option value="Música">Música</option>
+          <option value="Dança">Dança</option>
+          <option value="Teatro">Teatro</option>
+          <option value="Circo">Circo</option>
+          <option value="Pintura">Pintura / Artes Visuais</option>
+          <option value="Fotografia">Fotografia</option>
+          <option value="Literatura">Literatura</option>
+          <option value="Artesanato">Artesanato</option>
+          <option value="Cinema">Cinema & Vídeo</option>
+          <option value="Moda">Moda</option>
+          <option value="Eventos">Produção de Eventos</option>
+          <option value="Outros">Outros</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Eu quero...</label>
+        <select id="tipo" style="width:100%; padding:12px; border-radius:20px; border:none; box-shadow: inset 0 -1px 0 rgba(0,0,0,0.06); font-family:inherit;">
+          <option value="oferece">Oferecer meu serviço (Sou Artista)</option>
+          <option value="procura">Contratar um artista (Sou Cliente)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Descrição Detalhada</label>
+        <textarea id="descricao" placeholder="Conte mais sobre sua experiência, cachê base, disponibilidade..."></textarea>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <div class="form-group" style="flex:1">
+          <label class="form-label">Cidade</label>
+          <input id="cidade" type="text" value="Belém" />
+        </div>
+        <div class="form-group" style="width:80px">
+          <label class="form-label">UF</label>
+          <input id="estado" type="text" value="PA" />
+        </div>
+      </div>
+
+      <div style="text-align:center; margin-top:14px;">
+        <button class="btn" onclick="publicar()">Publicar Agora</button>
+      </div>
+      <p id="msg" style="text-align:center; margin-top:10px; color:var(--muted)"></p>
+    </div>
+  </main>
+
+  <script>
+    // Verifica se usuário está logado
+    const token = localStorage.getItem('enc_token');
+    if(!token) {
+      alert('Você precisa estar logado para publicar.');
+      window.location.href = 'login.html';
+    }
+
+    async function publicar() {
+      const btn = document.querySelector('.btn');
+      btn.disabled = true;
+      btn.innerText = "Enviando...";
+
+      const payload = {
+        titulo: document.getElementById('titulo').value,
+        categoria: document.getElementById('categoria').value,
+        tipo: document.getElementById('tipo').value,
+        descricao: document.getElementById('descricao').value,
+        cidade: document.getElementById('cidade').value,
+        estado: document.getElementById('estado').value
+      };
+
+      try {
+        const res = await fetch('/anuncios', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if(res.ok) {
+          document.getElementById('msg').innerText = "Sucesso! Redirecionando...";
+          setTimeout(() => window.location.href = 'recem-chegados.html', 1000);
+        } else {
+          const err = await res.json();
+          document.getElementById('msg').innerText = err.error || "Erro ao publicar.";
+          btn.disabled = false;
+          btn.innerText = "Publicar Agora";
+        }
+      } catch(e) {
+        console.error(e);
+        document.getElementById('msg').innerText = "Erro de conexão.";
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
